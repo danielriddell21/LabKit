@@ -39,7 +39,7 @@ export type RawRow = {
   notes?: string[];
 };
 
-export type TableResult = { rows: RawRow[]; headerFound: boolean; stamps: Stamp[] };
+export type TableResult = { rows: RawRow[]; headerFound: boolean; stamps: Stamp[]; warnings?: string[] };
 
 /** Returns the header's columns if this line is a column header for the template. */
 export function detectHeader(line: Line, t: Template): Column[] | undefined {

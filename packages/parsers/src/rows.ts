@@ -92,6 +92,8 @@ const cleanName = (s: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const ABBREV_SUFFIX = /\s*\((?=[^()]*[A-Z][^()]*[A-Z])[A-Za-z0-9\-/ ]{2,12}\)\s*$/;
+
 const fuzzyKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9%]/g, '');
 
 export type MatchResult = { entry?: DictionaryEntry; fuzzy: boolean; ambiguous: boolean; name: string };
@@ -117,6 +119,9 @@ export function makeMatcher(dictionary: Dictionary) {
     if (raw.nameBelowShort) candidates.push(`${raw.name} ${raw.nameBelowShort}`);
     if (raw.nameAbove) candidates.push(`${raw.nameAbove} ${raw.name}`);
     candidates.push(raw.name);
+    // Randox appends the abbreviation in parentheses: "Alanine Aminotransferase (ALT)". Try without it after
+    // the full name. Only abbreviations (2+ capitals) go: "(Urine)" and "(adjusted)" change the test.
+    if (vendor === 'randox') for (const c of [...candidates]) if (ABBREV_SUFFIX.test(c)) candidates.push(c.replace(ABBREV_SUFFIX, ''));
     for (const c of candidates.map(cleanName)) {
       const m = dictionary.match(vendor, c, panel);
       if (m.kind === 'exact') return { entry: m.entry, fuzzy: false, ambiguous: false, name: c };
@@ -183,7 +188,7 @@ export function evaluateRow(raw: RawRow, ctx: EvaluateContext): ParsedRow | unde
   if (e.valueType === 'quantity') {
     if (split.cell?.kind === 'quantity') {
       const printed = raw.unit ?? split.unit ?? rangeSplit.unit;
-      const unit = resolveUnit(printed, e);
+      const unit = resolveUnit(printed, e, ctx.vendor);
       if (!unit.ok) {
         issues.add('unit_mismatch');
       } else {

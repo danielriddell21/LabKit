@@ -103,6 +103,19 @@ test("Function Health 'results of record' (a ZIP with a .pdf name)", async ({ pa
   await expect(page.getByRole('heading', { name: /^Collected / })).toHaveCount(2);
 });
 
+test('Randox Health report (UK, SI units)', async ({ page }) => {
+  await choose(page, [FX + 'randox-sample.pdf']);
+  await expect(page.getByText('Alex Sample · Born Feb 7, 1985 · Male')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Collected / })).toHaveCount(1);
+  await expect(page.locator('li.result')).toHaveCount(33);
+  // SI values arrive in the dictionary's unit; vitals and scores are not lab results and never appear.
+  await expect(page.locator('li.result', { hasText: 'Hemoglobin' }).first()).toContainText('14.8 g/dL');
+  for (const name of ['Height', 'Body Mass Index', 'Pulse', 'Cardiovascular Risk', 'FIB-4', 'eGFR']) await expect(page.locator('li.result', { hasText: name })).toHaveCount(0);
+  // "not detected" for a numeric test can't be signed.
+  await expect(page.locator('li.result', { hasText: 'Microalbumin' }).getByText('Left Out')).toBeVisible();
+  await expect(page.getByText("Lines We Couldn't Match (1)")).toBeVisible();
+});
+
 test('photo of a printed report is read with on-device OCR', async ({ page, browser }, info) => {
   test.slow();
   // Render a report-like table to a PNG, as a stand-in for a phone photo.

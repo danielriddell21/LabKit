@@ -23,7 +23,7 @@ export function extractReport(pages: Page[], opts: ExtractOptions): ExtractedRep
   const pageText = new Map<number, string>();
   for (const l of lines) pageText.set(l.page, `${pageText.get(l.page) ?? ''}\n${l.text}`);
   const keep = (t: Template) => (l: { page: number }) => !t.pageFilter || t.pageFilter(pageText.get(l.page) ?? '');
-  let table = extractTable(lines.filter(keep(template)), template);
+  let table = template.extractTable ? template.extractTable(lines) : extractTable(lines.filter(keep(template)), template);
   if (!table.headerFound && template !== generic) {
     template = generic;
     table = extractTable(lines, generic);
@@ -32,6 +32,7 @@ export function extractReport(pages: Page[], opts: ExtractOptions): ExtractedRep
   if (skipped) warnings.push(`Skipped ${skipped} page${skipped === 1 ? '' : 's'} that repeat the same results in another layout.`);
 
   if (!table.headerFound) warnings.push("We couldn't find a results table in this file.");
+  warnings.push(...(table.warnings ?? []));
 
   const match = makeMatcher(opts.dictionary);
   const ctx = { vendor: template.aliasVendor, method: opts.method, maxConfidence: template.maxConfidence, match };
@@ -58,6 +59,8 @@ export function extractReport(pages: Page[], opts: ExtractOptions): ExtractedRep
   }
   if (undated) warnings.push(`${undated} result${undated === 1 ? '' : 's'} had no collection date and were left out.`);
 
+  if (template.dedupe) for (const d of draws.values()) d.rows = dedupeRows(d.rows, template.dedupe.preferRangeOver);
+
   // Duplicate LOINC codes within a draw: flag all copies; the user keeps one.
   for (const d of draws.values()) {
     const counts = new Map<string, number>();
@@ -72,9 +75,29 @@ export function extractReport(pages: Page[], opts: ExtractOptions): ExtractedRep
 
   return {
     source: { vendor: template.id, fileName: opts.fileName, method: opts.method },
-    patient: extractPatient(lines),
+    patient: template.patient ? template.patient(lines) : extractPatient(lines),
     draws: [...draws.values()].sort((a, b) => a.collectedAt.localeCompare(b.collectedAt)),
     unmatched,
     warnings,
   };
+}
+
+const sameValue = (a: ParsedRow, b: ParsedRow) => JSON.stringify(a.value) === JSON.stringify(b.value) && a.value !== undefined;
+
+/**
+ * One row per test when a report prints it in several panels with the same result. The copy kept sits
+ * where the test first appears; its reference range comes from the first panel not matching
+ * `preferRangeOver`. Copies whose values differ are left for the duplicate check to flag.
+ */
+export function dedupeRows(rows: ParsedRow[], preferRangeOver?: RegExp): ParsedRow[] {
+  const out: ParsedRow[] = [];
+  const done = new Set<ParsedRow>();
+  for (const r of rows) {
+    if (done.has(r)) continue;
+    const copies = rows.filter((x) => x.entry?.loinc === r.entry?.loinc && x.entry && (x === r || sameValue(x, r)));
+    copies.forEach((x) => done.add(x));
+    const preferred = (preferRangeOver && copies.find((x) => !preferRangeOver.test(x.raw.panel ?? ''))) || r;
+    out.push(preferred);
+  }
+  return out;
 }
