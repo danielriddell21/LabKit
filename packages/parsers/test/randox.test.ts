@@ -173,6 +173,24 @@ describe('Randox results table', () => {
     expect(rows.filter((x) => x.entry?.loinc === '2085-9').map((x) => x.issues)).toEqual([['duplicate'], ['duplicate']]);
   });
 
+  it('keeps one copy of a test printed as "not detected" in two panels', () => {
+    const r = run([
+      ...front(),
+      results([
+        [126, [40, 'Diabetes Health']],
+        row(144, 'Microalbumin / Creatinine Ratio', 'not detected', 'mg/mmol', 'Not Detected Normal'),
+        [184, [40, 'Kidney Health']],
+        row(202, 'Microalbumin / Creatinine Ratio', 'not detected', 'mg/mmol', 'Not Detected Normal'),
+      ]),
+      tail,
+    ]);
+    const acr = rowsOf(r).filter((x) => x.entry?.loinc === '30000-4');
+    expect(acr).toHaveLength(1);
+    expect(acr[0]?.issues).not.toContain('duplicate');
+    // No number to carry, so it still can't go in the card.
+    expect(acr[0]?.value).toBeUndefined();
+  });
+
   it('matches names with the abbreviation dropped, but keeps "(Urine)"', () => {
     const r = run([
       ...front(),

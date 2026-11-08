@@ -83,7 +83,15 @@ export function extractReport(pages: Page[], opts: ExtractOptions): ExtractedRep
   };
 }
 
-const sameValue = (a: ParsedRow, b: ParsedRow) => JSON.stringify(a.value) === JSON.stringify(b.value) && a.value !== undefined;
+const printed = (s: string | undefined) => (s ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+/**
+ * Same result: equal parsed values, or (when neither copy has one, e.g. "not detected" on a numeric
+ * test) the same printed value and unit. Two unparsed copies can't conflict if they read the same.
+ */
+const sameValue = (a: ParsedRow, b: ParsedRow) =>
+  a.value !== undefined
+    ? JSON.stringify(a.value) === JSON.stringify(b.value)
+    : b.value === undefined && printed(a.raw.value) !== '' && printed(a.raw.value) === printed(b.raw.value) && printed(a.raw.unit) === printed(b.raw.unit);
 
 /**
  * One row per test when a report prints it in several panels with the same result. The copy kept sits
