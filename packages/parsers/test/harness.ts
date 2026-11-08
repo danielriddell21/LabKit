@@ -2,11 +2,12 @@
 // ones locally. Reports field-level diffs as paths only, never values, so real
 // patient data can't leak into logs.
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { loadDictionary, toZonedIso, type DictionaryFile } from '@labkit/core';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { parseFile, type ExtractedReport, type PdfDocLike } from '../src';
 
-export const root = new URL('../../../', import.meta.url).pathname;
+export const root = fileURLToPath(new URL('../../../', import.meta.url)).replaceAll('\\', '/');
 export const dictionary = loadDictionary(JSON.parse(readFileSync(`${root}dictionary/dictionary.json`, 'utf8')) as DictionaryFile);
 
 // Same options as the browser (apps/web/src/lib/parse.ts): font data changes how
