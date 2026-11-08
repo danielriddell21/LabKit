@@ -56,7 +56,8 @@ const SKIP: RegExp[] = [...COMMON_SKIP, /randoxhealth\.com/i, /^randox\b/i, /^\d
 export const randox: Template = {
   id: 'randox',
   aliasVendor: 'randox',
-  detect: (t) => (/\bRANDOX\b/.test(t) && /results for your doctor/i.test(t) && /randoxhealth\.com/i.test(t) ? 20 : 0),
+  // Real reports print the name only as "Randox Health" (the logo is an image).
+  detect: (t) => (/\brandox\b/i.test(t) && /results for your doctor/i.test(t) && /randoxhealth\.com/i.test(t) ? 20 : 0),
   header: [
     { role: 'name', re: /^tests?$/i },
     { role: 'result', re: /^results?$/i },

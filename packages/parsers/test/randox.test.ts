@@ -42,6 +42,12 @@ describe('Randox detection', () => {
     expect(pickTemplate('RANDOX HEALTH\nResults for your Doctor\nrandoxhealth.com').id).toBe('randox');
     expect(pickTemplate('RANDOX HEALTH\nrandoxhealth.com').id).toBe('generic');
   });
+
+  it('accepts the name in mixed case (real reports draw the logo as an image)', () => {
+    expect(pickTemplate('Randox Health\nResults for your Doctor\nrandoxhealth.com').id).toBe('randox');
+    // The website alone doesn't count as the name.
+    expect(pickTemplate('Results for your Doctor\nrandoxhealth.com').id).toBe('generic');
+  });
 });
 
 describe('Randox header block', () => {
