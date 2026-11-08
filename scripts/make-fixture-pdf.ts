@@ -774,6 +774,7 @@ console.log('Wrote synthetic fixtures to fixtures/synthetic/');
     at?: number;
     expect: (Omit<Expect, 'value'> & { value?: number | string }) | 'unmatched' | null;
     breakBefore?: boolean;
+    vital?: { metric: string; value: number; unit: string };
   };
   type RSection = { panel: string; rows: RRow[] };
   const sig = (x: number) => Number(x.toPrecision(6));
@@ -790,15 +791,27 @@ console.log('Wrote synthetic fixtures to fixtures/synthetic/');
   const CHOL = 38.67;
   const sections: RSection[] = [
     {
-      panel: 'Physical Measurements',
+      // Vitals: never in the card; exported for HealthKit instead (expected under "vitals").
+      panel: 'Personal Health Measurements',
       rows: [
-        { name: 'Height', val: '178', unit: 'cm', bands: ['N/A'], expect: null },
-        { name: 'Weight', val: '80.4', unit: 'kg', bands: ['N/A'], expect: null },
-        { name: 'Body Mass Index (BMI)', val: '25.4', unit: 'kg/m²', bands: ['<18.5 Low', '18.5 - 24.9 Optimal', '≥25.0 High'], expect: null },
-        { name: 'Waist/Hip Ratio', val: '0.91', unit: 'Ratio', bands: ['≤0.95 Optimal'], expect: null },
-        { name: 'Pulse', val: '64', unit: 'BPM', bands: ['60 - 100 Optimal'], expect: null },
-        { name: 'Systolic Blood Pressure', val: '124', unit: 'mmHg', bands: ['≤130 Optimal'], expect: null },
-        { name: 'Diastolic Blood Pressure', val: '79', unit: 'mmHg', bands: ['≤85 Optimal'], expect: null },
+        { name: 'Height', val: '172.5', unit: 'cm', bands: ['N/A'], expect: null, vital: { metric: 'height', value: 1.725, unit: 'm' } },
+        { name: 'Weight', val: '80.4', unit: 'kg', bands: ['N/A'], expect: null, vital: { metric: 'bodyMass', value: 80.4, unit: 'kg' } },
+        { name: 'Body Mass Index (BMI)', val: '27.0', unit: 'kg/m²', bands: ['<18.5 Low', '18.5 - 24.9 Optimal', '≥25.0 High'], expect: null, vital: { metric: 'bodyMassIndex', value: 27, unit: 'count' } },
+        { name: 'Waist Circumference', val: '92', unit: 'cm', bands: ['≤94 Optimal', '>94 High'], at: 0, expect: null, vital: { metric: 'waistCircumference', value: 92, unit: 'cm' } },
+        { name: 'Hip Circumference', val: '101', unit: 'cm', bands: ['N/A'], expect: null, vital: { metric: 'hipCircumference', value: 101, unit: 'cm' } },
+        { name: 'Waist/Hip Ratio', val: '0.91', unit: 'Ratio', bands: ['≤0.95 Optimal'], expect: null, vital: { metric: 'waistHipRatio', value: 0.91, unit: 'ratio' } },
+        { name: 'Pulse', val: '64', unit: 'BPM', bands: ['60 - 100 Optimal'], expect: null, vital: { metric: 'heartRate', value: 64, unit: 'count/min' } },
+        { name: 'Oxygen Saturation', val: '98', unit: '%', bands: ['≥95 Optimal'], expect: null, vital: { metric: 'oxygenSaturation', value: 98, unit: '%' } },
+        {
+          name: 'Systolic Blood pressure',
+          val: '128',
+          unit: 'mmHg',
+          bands: ['<90 Low', '90 - 129 Optimal', '130 - 139 Raised', '≥140 High'],
+          at: 1,
+          expect: null,
+          vital: { metric: 'bloodPressureSystolic', value: 128, unit: 'mmHg' },
+        },
+        { name: 'Diastolic Blood pressure', val: '80', unit: 'mmHg', bands: ['<60 Low', '60 - 84 Optimal', '≥85 High'], expect: null, vital: { metric: 'bloodPressureDiastolic', value: 80, unit: 'mmHg' } },
       ],
     },
     {
@@ -825,6 +838,11 @@ console.log('Wrote synthetic fixtures to fixtures/synthetic/');
       // Prints HDL and triglycerides again with its own cut-offs: the Heart Health range is used.
       panel: 'Metabolic Syndrome',
       rows: [
+        // Vitals repeated here: one copy each in the export.
+        { name: 'Body Mass Index (BMI)', val: '27.0', unit: 'kg/m²', bands: ['<30.0 Optimal'], expect: null },
+        { name: 'Waist Circumference', val: '92', unit: 'cm', bands: ['<102 Optimal'], expect: null },
+        { name: 'Systolic Blood pressure', val: '128', unit: 'mmHg', bands: ['<130 Optimal'], expect: null },
+        { name: 'Diastolic Blood pressure', val: '80', unit: 'mmHg', bands: ['<85 Optimal'], expect: null },
         { name: 'HDL Cholesterol', val: '1.45', unit: 'mmol/l', bands: ['≤1.03 Low', '>1.03 Optimal'], at: 1, expect: null },
         { name: 'Triglycerides', val: '1.20', unit: 'mmol/l', bands: ['≤1.70 Optimal', '>1.70 High'], at: 0, expect: null },
       ],
@@ -946,7 +964,7 @@ console.log('Wrote synthetic fixtures to fixtures/synthetic/');
     ['Gender', 'Male'],
     ['CID', 'C0000000'],
     ['Sample ID', 'S0000000'],
-    ['Programme', 'Discovery'],
+    ['Programme', 'Discovery (male)'],
     ['Sample Collection Date', '14-May-2026 08:45'],
     ['Date of Report', '19-May-2026'],
     ['Fasted for', '10 hours and 15 minutes'],
@@ -1041,6 +1059,12 @@ console.log('Wrote synthetic fixtures to fixtures/synthetic/');
         // 08:45 British Summer Time.
         draws: [{ collected: { utc: '2026-05-14T07:45:00Z' }, rows: rows.flatMap((r) => (r.expect && r.expect !== 'unmatched' ? [{ issues: [], ...r.expect }] : [])) }],
         unmatched: rows.filter((r) => r.expect === 'unmatched').map((r) => arr(r.name).join(' ')),
+        vitals: {
+          collectedAt: '2026-05-14T08:45:00+01:00',
+          programme: 'Discovery (male)',
+          fastingMinutes: 615,
+          rows: rows.flatMap((r) => (r.vital ? [{ ...r.vital, issues: [] }] : [])),
+        },
       },
       null,
       2,

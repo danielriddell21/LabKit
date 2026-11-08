@@ -9,11 +9,11 @@
 // - "not detected" and its unit "mg/mmol creatinine" wrap across two lines.
 // So rows are rebuilt from coordinates: every line with a Result cell anchors a row, and each
 // fragment line (name, unit or band with no result) joins the row above or below it, split at the widest gap.
-import { parseCell, type ParsedReport } from '@labkit/core';
+import { parseCell, VITAL_BOUNDS, VITAL_UNITS, type ParsedReport } from '@labkit/core';
 import { parseStampText, zonedToUtc, type Stamp } from '../stamps';
 import { detectHeader, type Column, type RawRow, type TableResult } from '../table';
 import { COMMON_SKIP, type Template } from '../template';
-import type { Line, TextItem } from '../types';
+import type { Line, ParsedVital, TextItem } from '../types';
 
 const START = /^results for your doctor$/i;
 const END = /^nutrition guide\b/i;
@@ -23,16 +23,33 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 export const RANDOX_ZONE = 'Europe/London';
 
 /**
- * Not lab results (LabKit is lab-only): body measurements and vitals, and scores the report derives from
- * other rows. eGFR is left out too: Randox doesn't print the equation, and the only eGFR code in the
- * dictionary is CKD-EPI 2021, so a different equation would join the wrong trend.
+ * Scores the report derives from other rows: no lab code and no HealthKit type, so they're left out.
+ * eGFR too: Randox doesn't print the equation, and the only eGFR code in the dictionary is
+ * CKD-EPI 2021, so a different equation would join the wrong trend.
  */
-const EXCLUDED =
-  /^(height|weight|body mass index|bmi|body fat|waist|hip|waist\s*(?:\/|:|to)\s*hip|pulse|heart rate|resting heart rate|oxygen saturation|spo2|systolic|diastolic|blood pressure|cardiovascular risk|qrisk|fib-?4|fibrosis-4|egfr|estimated glomerular filtration rate|estimated gfr)\b/i;
+const DERIVED = /^(body fat|cardiovascular risk|qrisk|fib-?4|fibrosis-4|egfr|estimated glomerular filtration rate|estimated gfr)\b/i;
+
+/**
+ * Body measurements and vitals: not lab results, so never in the card (LabKit is lab-only). They're kept
+ * apart as vitals for the HealthKit paths (vitals.json, CSV). First match wins: waist/hip ratio before waist.
+ */
+const VITAL_NAMES: [RegExp, ParsedVital['metric'] | 'bloodPressure'][] = [
+  [/^waist\s*(?:\/|:|to)\s*hip\b/i, 'waistHipRatio'],
+  [/^height\b/i, 'height'],
+  [/^(?:body\s+)?weight\b/i, 'bodyMass'],
+  [/^(?:body mass index|bmi)\b/i, 'bodyMassIndex'],
+  [/^waist(?: circumference)?\b/i, 'waistCircumference'],
+  [/^hip(?: circumference)?\b/i, 'hipCircumference'],
+  [/^(?:pulse|heart rate|resting heart rate)\b/i, 'heartRate'],
+  [/^(?:oxygen saturation|spo2|sp o2|blood oxygen)\b/i, 'oxygenSaturation'],
+  [/^systolic\b/i, 'bloodPressureSystolic'],
+  [/^diastolic\b/i, 'bloodPressureDiastolic'],
+  [/^blood pressure\b/i, 'bloodPressure'],
+];
 
 /** Panel headings ("Heart Health", "Full Blood Count", "Iron Status"…); test names never end this way. */
 const PANEL_NAME =
-  /^(full blood count|metabolic syndrome|diabetes|urinalysis|urine analysis|immunity|inflammation|physical measurements|vital signs|.+ (health|status|profile|function|screen|screening|markers|count|panel|hormones|vitamins|minerals))$|^(vitamins|minerals|hormones)( .+)?$/i;
+  /^(full blood count|metabolic syndrome|diabetes|urinalysis|urine analysis|immunity|inflammation|physical measurements|vital signs|.+ (health|status|profile|function|screen|screening|markers|count|panel|hormones|vitamins|minerals|measurements))$|^(vitamins|minerals|hormones)( .+)?$/i;
 
 const SKIP: RegExp[] = [...COMMON_SKIP, /randoxhealth\.com/i, /^randox\b/i, /^\d{1,3}$/, /^results for your doctor$/i];
 
@@ -359,18 +376,26 @@ export function randoxTable(lines: Line[]): TableResult {
   if (prev) between.forEach((f) => give(prev!, f));
 
   const rows: RawRow[] = [];
+  const vitals: ParsedVital[] = [];
   let excluded = 0;
   for (const a of anchors) {
     const above = join(a.names.filter((n) => n.y < a.y).sort((x, y) => x.y - y.y).map((n) => n.text));
     const own = join(a.cells.name);
     const below = join(a.names.filter((n) => n.y > a.y).sort((x, y) => x.y - y.y).map((n) => n.text));
     const full = join([above, own, below]);
-    if (EXCLUDED.test(full) || EXCLUDED.test(own)) {
+    if (DERIVED.test(full) || DERIVED.test(own)) {
       excluded++;
       continue;
     }
     const value = join(a.cells.result);
     const unit = randoxUnit(join([...a.units, { y: a.y, text: join(a.cells.units) }].sort((x, y) => x.y - y.y).map((u) => u.text)));
+    const vital = VITAL_NAMES.find(([re]) => re.test(full) || re.test(own))?.[1];
+    if (vital) {
+      // Vital bands (BMI, BP…) are irrelevant to HealthKit: only the value and unit are kept.
+      const raw = { name: full, value, ...(unit ? { unit } : {}), ...(a.panel ? { panel: a.panel } : {}), page: a.page, line: [full, value, unit].filter(Boolean).join('  ') };
+      vitals.push(...toVitals(vital, value, unit, raw));
+      continue;
+    }
     const bands = a.bands.sort((x, y) => x.y - y.y).map((b) => b.band);
     const ref = referenceBand(bands);
     const range = ref && bandRange(ref);
@@ -387,6 +412,88 @@ export function randoxTable(lines: Line[]): TableResult {
     if (stamp) row.collected = stamp;
     rows.push(row);
   }
-  const warnings = excluded ? [`Left out ${excluded} row${excluded === 1 ? '' : 's'} that aren't lab results (body measurements and calculated scores).`] : [];
-  return { rows, headerFound, stamps, warnings };
+  const warnings = excluded ? [`Left out ${excluded} calculated score${excluded === 1 ? '' : 's'} (not lab results).`] : [];
+  const head = lines.slice(0, start);
+  const fasting = labelValue(head, /fasted for|fasting(?: duration)?/);
+  const fm = fasting && /^(?:(\d+)\s*h(?:ours?|rs?)?)?\s*(?:and\s*)?(?:(\d+)\s*m(?:in(?:ute)?s?)?)?\s*$/i.exec(fasting.trim());
+  const fastingMinutes = fm && (fm[1] || fm[2]) ? Number(fm[1] ?? 0) * 60 + Number(fm[2] ?? 0) : undefined;
+  const programme = labelValue(head, /programme|program/);
+  const sampleId = labelValue(head, /sample id/);
+  return {
+    rows,
+    headerFound,
+    stamps,
+    warnings,
+    vitals: {
+      lab: 'Randox Health',
+      zone: RANDOX_ZONE,
+      ...(stamp ? { collectedAt: stamp.iso } : {}),
+      ...(programme ? { programme } : {}),
+      ...(sampleId ? { sampleId } : {}),
+      ...(fastingMinutes !== undefined ? { fastingMinutes } : {}),
+      rows: dedupeVitals(vitals),
+    },
+  };
+}
+
+// ---------------------------------------------------------------- vitals
+
+/** Printed unit → factor to the metric's canonical unit (VITAL_UNITS). Missing entries: unit can't be used. */
+const VITAL_UNIT_FACTORS: Record<ParsedVital['metric'], Record<string, number>> = {
+  height: { m: 1, cm: 0.01, mm: 0.001 },
+  bodyMass: { kg: 1, kgs: 1, lb: 0.45359237, lbs: 0.45359237 },
+  bodyMassIndex: { '': 1, 'kg/m2': 1, 'kg/m²': 1 },
+  waistCircumference: { cm: 1, m: 100, mm: 0.1, in: 2.54 },
+  hipCircumference: { cm: 1, m: 100, mm: 0.1, in: 2.54 },
+  heartRate: { '': 1, bpm: 1, 'beats/min': 1, '/min': 1, 'count/min': 1 },
+  oxygenSaturation: { '%': 1 },
+  bloodPressureSystolic: { mmhg: 1 },
+  bloodPressureDiastolic: { mmhg: 1 },
+  waistHipRatio: { '': 1, ratio: 1 },
+};
+
+const sig = (x: number) => Number(x.toPrecision(6));
+
+function toVitals(metric: ParsedVital['metric'] | 'bloodPressure', value: string, unit: string | undefined, raw: ParsedVital['raw']): ParsedVital[] {
+  if (metric === 'bloodPressure') {
+    // One row printed as "128/80".
+    const m = /^(\d{2,3})\s*\/\s*(\d{2,3})$/.exec(value);
+    if (!m) return [{ metric: 'bloodPressureSystolic', raw, issues: ['unreadable'] }];
+    return [toVital('bloodPressureSystolic', m[1]!, unit, raw), toVital('bloodPressureDiastolic', m[2]!, unit, raw)];
+  }
+  return [toVital(metric, value, unit, raw)];
+}
+
+function toVital(metric: ParsedVital['metric'], value: string, unit: string | undefined, raw: ParsedVital['raw']): ParsedVital {
+  const n = /^\d+(?:\.\d+)?$/.test(value.trim()) ? Number(value) : undefined;
+  if (n === undefined) return { metric, raw, issues: ['unreadable'] };
+  const key = (unit ?? '').normalize('NFC').replace(/\s+/g, '').toLowerCase();
+  const factor = VITAL_UNIT_FACTORS[metric][key];
+  if (factor === undefined) return { metric, raw, issues: ['unit'] };
+  const v = factor === 1 ? n : sig(n * factor);
+  const out: ParsedVital = { metric, value: v, unit: metric === 'waistHipRatio' ? 'ratio' : VITAL_UNITS[metric], raw, issues: [] };
+  if (metric !== 'waistHipRatio' && (v < VITAL_BOUNDS[metric].min || v > VITAL_BOUNDS[metric].max)) out.issues.push('implausible');
+  return out;
+}
+
+/**
+ * One row per metric. Height, weight, BMI, waist and BP repeat under Metabolic Syndrome: the copy from any
+ * other panel (Personal Health Measurements) is kept. Copies that disagree are flagged for review.
+ */
+export function dedupeVitals(all: ParsedVital[]): ParsedVital[] {
+  const out: ParsedVital[] = [];
+  for (const metric of new Set(all.map((v) => v.metric))) {
+    const copies = all.filter((v) => v.metric === metric);
+    const keep = { ...(copies.find((v) => !/metabolic syndrome/i.test(v.raw.panel ?? '')) ?? copies[0]!) };
+    keep.issues = [...keep.issues];
+    if (copies.some((c) => c.value !== keep.value)) keep.issues.push('conflict');
+    out.push(keep);
+  }
+  const sys = out.find((v) => v.metric === 'bloodPressureSystolic');
+  const dia = out.find((v) => v.metric === 'bloodPressureDiastolic');
+  if (sys?.value !== undefined && dia?.value !== undefined && !(sys.value > dia.value)) {
+    sys.issues.push('order');
+    dia.issues.push('order');
+  }
+  return out;
 }

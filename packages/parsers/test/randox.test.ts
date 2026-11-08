@@ -2,9 +2,9 @@
 import { describe, expect, it } from 'vitest';
 import { extractReport } from '../src/extract';
 import { groupLines } from '../src/layout';
-import type { Page } from '../src/types';
+import type { Page, ParsedVital } from '../src/types';
 import { pickTemplate } from '../src/vendors';
-import { computeFlag, parseBand, randoxCollected, randoxPatient, randoxUnit, referenceBand, type Band } from '../src/vendors/randox';
+import { computeFlag, dedupeVitals, parseBand, randoxCollected, randoxPatient, randoxUnit, referenceBand, type Band } from '../src/vendors/randox';
 import { dictionary } from './harness';
 
 type Cell = [x: number, str: string];
@@ -139,7 +139,11 @@ describe('Randox results table', () => {
       ['786-4', { kind: 'quantity', value: 33.5, ucum: 'g/dL' }, { low: 32.01, high: 36 }, undefined],
     ]);
     expect(r.unmatched).toEqual([]);
-    expect(r.warnings).toContain("Left out 2 rows that aren't lab results (body measurements and calculated scores).");
+    // Body measurements are vitals, not results: out of the card, into the vitals export.
+    expect(r.vitals?.rows.map((v) => [v.metric, v.value, v.unit])).toEqual([
+      ['bodyMassIndex', 25.4, 'count'],
+      ['waistHipRatio', 0.91, 'ratio'],
+    ]);
   });
 
   it('keeps one row per test across panels, with the range from outside Metabolic Syndrome', () => {
@@ -183,5 +187,58 @@ describe('Randox results table', () => {
   it('finds no table without the results section', () => {
     const r = run([...front(), tail]);
     expect(rowsOf(r)).toEqual([]);
+  });
+});
+
+describe('Randox vitals', () => {
+  const vitalsOf = (rows: [number, ...Cell[]][]) => run([...front(), results(rows), tail]);
+
+  it('converts units, keeps Glucose a lab result and leaves out scores', () => {
+    const r = vitalsOf([
+      [126, [40, 'Personal Health Measurements']],
+      row(144, 'Height', '172.5', 'cm'),
+      row(161, 'Weight', '176', 'lbs'),
+      row(178, 'Blood Pressure', '128/80', 'mmHg'),
+      row(195, 'Cardiovascular Risk Score', '4.2', '%'),
+      [216, [40, 'Diabetes']],
+      row(234, 'Glucose', '5.2', 'mmol/l', '3.9 - 5.5 Optimal'),
+    ]);
+    expect(r.vitals?.rows.map((v) => [v.metric, v.value, v.unit, v.issues])).toEqual([
+      ['height', 1.725, 'm', []],
+      ['bodyMass', 79.8323, 'kg', []],
+      ['bloodPressureSystolic', 128, 'mmHg', []],
+      ['bloodPressureDiastolic', 80, 'mmHg', []],
+    ]);
+    expect(rowsOf(r).map((x) => x.entry?.loinc)).toEqual(['2345-7']);
+    expect(r.warnings).toContain('Left out 1 calculated score (not lab results).');
+  });
+
+  it('flags implausible values, unusable units and values that are not numbers', () => {
+    const r = vitalsOf([
+      [126, [40, 'Personal Health Measurements']],
+      row(144, 'Pulse', '300', 'BPM'),
+      row(161, 'Height', '5.8', 'ft'),
+      row(178, 'Oxygen Saturation', 'N/A', '%'),
+    ]);
+    expect(r.vitals?.rows.map((v) => [v.metric, v.issues])).toEqual([
+      ['heartRate', ['implausible']],
+      ['height', ['unit']],
+      ['oxygenSaturation', ['unreadable']],
+    ]);
+  });
+
+  const v = (metric: ParsedVital['metric'], value: number, panel: string): ParsedVital => ({ metric, value, unit: 'x', raw: { name: metric, value: String(value), panel, page: 5, line: '' }, issues: [] });
+
+  it('keeps one copy per metric, from outside Metabolic Syndrome, and flags copies that disagree', () => {
+    const out = dedupeVitals([v('bodyMassIndex', 27.1, 'Metabolic Syndrome'), v('bodyMassIndex', 27, 'Personal Health Measurements'), v('waistCircumference', 92, 'Personal Health Measurements')]);
+    expect(out.map((x) => [x.metric, x.value, x.raw.panel, x.issues])).toEqual([
+      ['bodyMassIndex', 27, 'Personal Health Measurements', ['conflict']],
+      ['waistCircumference', 92, 'Personal Health Measurements', []],
+    ]);
+  });
+
+  it('flags blood pressure whose systolic is not above diastolic', () => {
+    const out = dedupeVitals([v('bloodPressureSystolic', 80, 'P'), v('bloodPressureDiastolic', 120, 'P')]);
+    expect(out.map((x) => x.issues)).toEqual([['order'], ['order']]);
   });
 });

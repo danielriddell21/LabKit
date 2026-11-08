@@ -297,5 +297,72 @@
   ],
   "unmatched": [
     "Total Antioxidant Status (TAS)"
-  ]
+  ],
+  "vitals": {
+    "collectedAt": "2026-05-14T08:45:00+01:00",
+    "programme": "Discovery (male)",
+    "fastingMinutes": 615,
+    "rows": [
+      {
+        "metric": "height",
+        "value": 1.725,
+        "unit": "m",
+        "issues": []
+      },
+      {
+        "metric": "bodyMass",
+        "value": 80.4,
+        "unit": "kg",
+        "issues": []
+      },
+      {
+        "metric": "bodyMassIndex",
+        "value": 27,
+        "unit": "count",
+        "issues": []
+      },
+      {
+        "metric": "waistCircumference",
+        "value": 92,
+        "unit": "cm",
+        "issues": []
+      },
+      {
+        "metric": "hipCircumference",
+        "value": 101,
+        "unit": "cm",
+        "issues": []
+      },
+      {
+        "metric": "waistHipRatio",
+        "value": 0.91,
+        "unit": "ratio",
+        "issues": []
+      },
+      {
+        "metric": "heartRate",
+        "value": 64,
+        "unit": "count/min",
+        "issues": []
+      },
+      {
+        "metric": "oxygenSaturation",
+        "value": 98,
+        "unit": "%",
+        "issues": []
+      },
+      {
+        "metric": "bloodPressureSystolic",
+        "value": 128,
+        "unit": "mmHg",
+        "issues": []
+      },
+      {
+        "metric": "bloodPressureDiastolic",
+        "value": 80,
+        "unit": "mmHg",
+        "issues": []
+      }
+    ]
+  }
 }

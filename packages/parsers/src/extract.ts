@@ -5,11 +5,11 @@ import { evaluateRow, makeMatcher } from './rows';
 import { extractPatient } from './stamps';
 import { extractTable } from './table';
 import type { Template } from './template';
-import type { Method, Page } from './types';
+import type { Method, Page, ReportVitals } from './types';
 import { generic, pickTemplate } from './vendors';
 
 export type Draw = { collectedAt: string; timeFound: boolean; rows: ParsedRow[] };
-export type ExtractedReport = ParsedReport & { draws: Draw[]; warnings: string[] };
+export type ExtractedReport = ParsedReport & { draws: Draw[]; warnings: string[]; vitals?: ReportVitals };
 
 export type ExtractOptions = { fileName: string; method: Method; dictionary: Dictionary; template?: Template };
 
@@ -79,6 +79,7 @@ export function extractReport(pages: Page[], opts: ExtractOptions): ExtractedRep
     draws: [...draws.values()].sort((a, b) => a.collectedAt.localeCompare(b.collectedAt)),
     unmatched,
     warnings,
+    ...(table.vitals?.rows.length ? { vitals: table.vitals } : {}),
   };
 }
 
