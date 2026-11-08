@@ -39,6 +39,8 @@ function rangeText(row: ParsedRow): string {
 
 function checkReason(row: ParsedRow): string {
   if (row.issues.includes('duplicate')) return 'This test appears more than once for this date. Keep one and leave the other out.';
+  if (row.issues.includes('formula_not_printed'))
+    return "Calculated by the lab. The report doesn't say which formula it used, so this is saved as eGFR without one and won't join eGFR results from other labs. Include it only if that's fine.";
   if (row.issues.includes('ocr')) return 'Read from a scan. Compare it with your report.';
   if (row.confidence === 'medium') return "We're less sure about this match. Compare it with your report.";
   return 'Compare this with your report.';

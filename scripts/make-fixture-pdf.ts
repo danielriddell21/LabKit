@@ -872,7 +872,14 @@ console.log('Wrote synthetic fixtures to fixtures/synthetic/');
       panel: 'Kidney Health',
       rows: [
         { name: 'Creatinine', val: '88', unit: 'µmol/l', bands: ['59 - 104 Optimal'], expect: q('2160-0', 88, 'mg/dL', 0.0113122, { low: 59, high: 104 }) },
-        { name: 'eGFR', val: '>90', unit: 'ml/min/1.73m²', bands: ['≥90 Optimal'], expect: null },
+        // No equation printed: the code that names none, waiting for the user to opt in.
+        {
+          name: 'eGFR',
+          val: '>90',
+          unit: 'ml/min/1.73m²',
+          bands: ['≥90 Optimal'],
+          expect: q('69405-9', 90, 'mL/min/{1.73_m2}', 1, { low: 90 }, { comparator: '>', confidence: 'low', issues: ['formula_not_printed'] }),
+        },
         { name: 'Urea', val: '5.1', unit: 'mmol/l', bands: ['2.5 - 7.8 Optimal'], expect: q('22664-7', 5.1, 'mmol/L', 1, { low: 2.5, high: 7.8 }) },
         { name: 'Sodium', val: '140', unit: 'mmol/l', bands: ['133 - 146 Optimal'], expect: q('2951-2', 140, 'mmol/L', 1, { low: 133, high: 146 }) },
         // Below its band: the printed value-line band says Optimal; only colour would show it's low.

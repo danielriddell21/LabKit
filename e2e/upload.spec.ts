@@ -108,10 +108,12 @@ test('Randox Health report (UK, SI units): lab card plus vitals export', async (
   await expect(page.getByText('Alex Sample · Born Feb 7, 1985 · Male')).toBeVisible();
   await expect(page.getByRole('heading', { name: /^Collected / })).toHaveCount(1);
   const labs = page.locator('li.result:not(.vital)');
-  await expect(labs).toHaveCount(33);
-  // SI values arrive in the dictionary's unit; vitals and scores are never card rows.
+  await expect(labs).toHaveCount(34);
+  // SI values arrive in the dictionary's unit; vitals and risk scores are never card rows.
   await expect(labs.filter({ hasText: 'Hemoglobin' }).first()).toContainText('14.8 g/dL');
-  for (const name of ['Height', 'Body Mass Index', 'Pulse', 'Cardiovascular Risk', 'FIB-4', 'eGFR']) await expect(labs.filter({ hasText: name })).toHaveCount(0);
+  for (const name of ['Height', 'Body Mass Index', 'Pulse', 'Cardiovascular Risk', 'FIB-4']) await expect(labs.filter({ hasText: name })).toHaveCount(0);
+  // eGFR: no equation printed, so it waits for the user with an explanation.
+  await expect(labs.filter({ hasText: 'eGFR' })).toContainText("doesn't say which formula");
   // "not detected" for a numeric test can't be signed.
   await expect(labs.filter({ hasText: 'Microalbumin' }).getByText('Left Out')).toBeVisible();
   await expect(page.getByText("Lines We Couldn't Match (1)")).toBeVisible();

@@ -23,11 +23,11 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 export const RANDOX_ZONE = 'Europe/London';
 
 /**
- * Scores the report derives from other rows: no lab code and no HealthKit type, so they're left out.
- * eGFR too: Randox doesn't print the equation, and the only eGFR code in the dictionary is
- * CKD-EPI 2021, so a different equation would join the wrong trend.
+ * Scores the report derives from other rows: risk scores (SPEC §11.6) and body fat, so they're left out.
+ * eGFR is kept: Randox doesn't print the equation, so it maps to 69405-9 (no equation named), never to
+ * the CKD-EPI 2021 code, and the row waits for the user to opt in (`formula_not_printed`).
  */
-const DERIVED = /^(body fat|cardiovascular risk|qrisk|fib-?4|fibrosis-4|egfr|estimated glomerular filtration rate|estimated gfr)\b/i;
+const DERIVED = /^(body fat|cardiovascular risk|qrisk|fib-?4|fibrosis-4)\b/i;
 
 /**
  * Body measurements and vitals: not lab results, so never in the card (LabKit is lab-only). They're kept

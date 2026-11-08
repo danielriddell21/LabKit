@@ -2,6 +2,13 @@
 
 Record every change to `dictionary.json` here. `loinc`, `display` and `text` of an entry in `FROZEN.json` must never change.
 
+## 2026-11-08: eGFR without a named equation (Randox)
+
+- Added 69405-9 "Glomerular filtration rate [Volume Rate/Area] in Serum, Plasma or Blood by based on 1.73 sq M" (`text` "eGFR"; ACTIVE and `display` verbatim from LOINC 2.83 on tx.fhir.org). Its method names no equation, which matches Randox reports: they print eGFR without saying how it was calculated.
+- Aliases are `randox` only ("eGFR", "Estimated Glomerular Filtration Rate", "Estimated GFR"), so Quest/Labcorp/generic "eGFR" still maps to 98979-8 (CKD-EPI 2021). The two codes form separate trends in Apple Health by design: merging them would mix equations.
+- Rows with this code carry the `formula_not_printed` issue: never signed automatically, pending until the user opts in on the review screen.
+- Not yet in `FROZEN.json`.
+
 ## 2026-11-07: Randox Health (UK, SI units)
 
 - New alias vendor `randox` for Randox Health "Discovery" reports. Randox names (British spellings: Haemoglobin, Haematocrit, Oestradiol, Luteinising, Folic Acid; "(Urine)"/"(adjusted)" suffixes) added as aliases on existing entries. The parser also tries a name without a trailing abbreviation in parentheses ("Alanine Aminotransferase (ALT)"), only for `randox`.

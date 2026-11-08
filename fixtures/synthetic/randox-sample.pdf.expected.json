@@ -161,6 +161,17 @@
           "confidence": "high"
         },
         {
+          "issues": [
+            "formula_not_printed"
+          ],
+          "loinc": "69405-9",
+          "value": 90,
+          "ucum": "mL/min/{1.73_m2}",
+          "low": 90,
+          "confidence": "low",
+          "comparator": ">"
+        },
+        {
           "issues": [],
           "loinc": "22664-7",
           "value": 5.1,

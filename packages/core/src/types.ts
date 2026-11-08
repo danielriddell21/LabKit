@@ -89,7 +89,7 @@ export type ParsedValue =
   | { kind: 'quantity'; value: number; comparator?: Comparator; ucum: string }
   | { kind: 'qualitative' | 'titer'; text: string };
 
-export type RowIssue = 'ocr' | 'unit_mismatch' | 'implausible' | 'ambiguous_match' | 'duplicate' | 'no_range';
+export type RowIssue = 'ocr' | 'unit_mismatch' | 'implausible' | 'ambiguous_match' | 'duplicate' | 'no_range' | 'formula_not_printed';
 
 export type ParsedRow = {
   raw: { name: string; value: string; flag?: string; range?: string; unit?: string; panel?: string; page: number; line: string };

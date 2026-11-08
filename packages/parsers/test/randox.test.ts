@@ -173,6 +173,25 @@ describe('Randox results table', () => {
     expect(rows.filter((x) => x.entry?.loinc === '2085-9').map((x) => x.issues)).toEqual([['duplicate'], ['duplicate']]);
   });
 
+  it('keeps eGFR under the code that names no equation, pending opt-in; still leaves out risk scores', () => {
+    const r = run([
+      ...front(),
+      results([
+        [126, [40, 'Kidney Health']],
+        row(144, 'eGFR', '>90', 'ml/min/1.73m²', '≥90 Optimal'),
+        row(161, 'FIB-4', '0.85', '-', '<1.30 Low Risk'),
+      ]),
+      tail,
+    ]);
+    const rows = rowsOf(r);
+    expect(rows.map((x) => [x.entry?.loinc, x.value, x.range, x.issues, x.confidence])).toEqual([
+      ['69405-9', { kind: 'quantity', value: 90, ucum: 'mL/min/{1.73_m2}', comparator: '>' }, { low: 90 }, ['formula_not_printed'], 'low'],
+    ]);
+    // Never the CKD-EPI 2021 code: a different equation would join the wrong trend.
+    expect(rows.some((x) => x.entry?.loinc === '98979-8')).toBe(false);
+    expect(r.warnings).toContain('Left out 1 calculated score (not lab results).');
+  });
+
   it('keeps one copy of a test printed as "not detected" in two panels', () => {
     const r = run([
       ...front(),

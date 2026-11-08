@@ -26,6 +26,11 @@ const FLAG_RE = /^(?:\(?(?:H|L|HH|LL|A|AA)\)?|High|Low|Abnormal|Abn|Critical|Cri
 const BLOCKING: readonly RowIssue[] = ['implausible', 'unit_mismatch', 'ambiguous_match'];
 /** Informational only: a missing reference range says nothing about whether the value was read correctly. */
 const INFO: readonly RowIssue[] = ['no_range'];
+/**
+ * Codes that name no calculation method (eGFR 69405-9): the lab didn't print which equation it used.
+ * Not blocking, but the row stays pending until the user opts in.
+ */
+const FORMULA_NOT_PRINTED: ReadonlySet<string> = new Set(['69405-9']);
 
 const NOTE_RANGE = /^\s*reference\s+range(?:\s*:\s+|\s+)(\S(?:.*\S)?)\s*$/i;
 
@@ -223,6 +228,7 @@ export function evaluateRow(raw: RawRow, ctx: EvaluateContext): ParsedRow | unde
   }
 
   if (ctx.method === 'ocr') issues.add('ocr');
+  if (FORMULA_NOT_PRINTED.has(e.loinc)) issues.add('formula_not_printed');
   out.issues = [...issues];
   const hard = out.issues.some((i) => !INFO.includes(i));
   out.confidence = hard || !out.value ? 'low' : soft > 0 || ctx.maxConfidence === 'medium' ? 'medium' : 'high';

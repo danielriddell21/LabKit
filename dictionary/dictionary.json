@@ -1985,6 +1985,35 @@
       ]
     },
     {
+      "loinc": "69405-9",
+      "display": "Glomerular filtration rate [Volume Rate/Area] in Serum, Plasma or Blood by based on 1.73 sq M",
+      "text": "eGFR",
+      "category": "kidney_liver_electrolytes",
+      "valueType": "quantity",
+      "ucum": "mL/min/{1.73_m2}",
+      "unitAliases": {
+        "mL/min/1.73m2": "mL/min/{1.73_m2}"
+      },
+      "plausible": {
+        "min": 0,
+        "max": 250
+      },
+      "aliases": [
+        {
+          "vendor": "randox",
+          "name": "eGFR"
+        },
+        {
+          "vendor": "randox",
+          "name": "Estimated Glomerular Filtration Rate"
+        },
+        {
+          "vendor": "randox",
+          "name": "Estimated GFR"
+        }
+      ]
+    },
+    {
       "loinc": "2324-2",
       "display": "Gamma glutamyl transferase [Enzymatic activity/volume] in Serum or Plasma",
       "text": "Gamma-glutamyl Transferase",
